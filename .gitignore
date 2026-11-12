@@ -1,0 +1,14 @@
+/.env
+/docker-compose.yml
+/logs_files/
+/data/
+/build.sh
+/.venv/
+build/
+dist/
+.coverage
+.idea/
+__pycache__/
+.pytest_cache/
+/docs/
+/scripts/
