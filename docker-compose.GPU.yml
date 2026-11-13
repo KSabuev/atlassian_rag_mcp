@@ -1,0 +1,82 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__MAX_WORKERS: "16"
+      QDRANT__STORAGE__PERFORMANCE__OPTIMIZER_CPU_BUDGET: "4"
+      QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS: "8"
+      QDRANT__STORAGE__PERFORMANCE__MAX_OPTIMIZATION_THREADS: "2"
+      QDRANT__LOG_LEVEL: "WARN"
+      QDRANT__TELEMETRY_DISABLED: "true"
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'PORT_HEX="$(printf ''%04X'' 6333)"; cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -q ":$${PORT_HEX} "'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  atlassian-rag-mcp:
+    image: sabuev/atlassian-rag-mcp:latest
+    container_name: atlassian-rag-mcp
+    restart: unless-stopped
+    ports:
+      - "8800:8800"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8800
+      - API_KEY=${API_KEY}
+      - WORKING_DIR=/app/data
+
+      - CONFLUENCE_URL=${CONFLUENCE_URL}
+      - CONFLUENCE_USERNAME=${CONFLUENCE_USERNAME}
+      - CONFLUENCE_PASSWORD=${CONFLUENCE_PASSWORD}
+      - CONFLUENCE_SPACE_KEY=${CONFLUENCE_SPACE_KEY}
+      - CONFLUENCE_TIMEOUT=${CONFLUENCE_TIMEOUT:-120}
+
+      - JIRA_URL=${JIRA_URL}
+      - JIRA_USERNAME=${JIRA_USERNAME}
+      - JIRA_PASSWORD=${JIRA_PASSWORD}
+      - JIRA_PROJECT_KEYS=${JIRA_PROJECT_KEYS}
+      - JIRA_PLUGINS=${JIRA_PLUGINS}
+
+      - LOG_LEVEL=INFO
+
+      - EMBEDDING_BINDING=openai_compat
+      - EMBEDDING_URL=${EMBEDDING_URL}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-2560}
+      - EMBEDDING_MAX_WORKERS=4
+
+      - TOP_K=${TOP_K:-20}
+
+      - VECTOR_DB=qdrant
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=atlassian_chunks
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+    volumes:
+      - atlassian-rag-mcp-data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  qdrant_data:
+  atlassian-rag-mcp-data:
